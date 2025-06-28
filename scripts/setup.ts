@@ -7,12 +7,14 @@ import { cancel, intro, outro, select, spinner, text } from "@clack/prompts";
 import { default as toml } from "@iarna/toml";
 
 // Function to execute shell commands
-function executeCommand(command: string) {
+function executeCommand(command: string): string {
     console.log(`\x1b[33m${command}\x1b[0m`);
     try {
         return execSync(command, { encoding: "utf-8" });
     } catch (error: any) {
-        return { error: true, message: error.stdout || error.stderr };
+        console.error(`\x1b[31mCommand failed: ${command}\x1b[0m`);
+        console.error(`\x1b[31mError: ${error.message}\x1b[0m`);
+        return ""; // Return empty string on error
     }
 }
 
@@ -122,30 +124,37 @@ async function createDatabaseAndConfigure() {
     // Run command to create a new database
     const creationOutput = executeCommand(`bunx wrangler d1 create ${dbName}`);
 
-    if (creationOutput === undefined || typeof creationOutput !== "string") {
+    if (!creationOutput || creationOutput.trim() === "") {
         console.log(
             "\x1b[33mDatabase creation failed, maybe you have already created a database with that name. I'll try to find the database ID for you.\x1b[0m",
         );
         const dbInfoOutput = executeCommand(`bunx wrangler d1 info ${dbName}`);
-        const getInfo = (dbInfoOutput as string).match(
-            /│ [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} │/i,
-        );
-        if (getInfo && getInfo.length === 1) {
-            console.log(
-                "\x1b[33mFound it! The database ID is: ",
-                getInfo[0],
-                "\x1b[0m",
+        if (dbInfoOutput) {
+            const getInfo = dbInfoOutput.match(
+                /│ [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12} │/i,
             );
-            databaseID = getInfo[0].replace("│ ", "").replace(" │", "");
+            if (getInfo && getInfo.length === 1) {
+                console.log(
+                    "\x1b[33mFound it! The database ID is: ",
+                    getInfo[0],
+                    "\x1b[0m",
+                );
+                databaseID = getInfo[0].replace("│ ", "").replace(" │", "");
+            } else {
+                console.error(
+                    "\x1b[31mSomething went wrong when initialising the database. Please try again.\x1b[0m",
+                );
+                cancel("Operation cancelled.");
+            }
         } else {
             console.error(
-                "\x1b[31mSomething went wrong when initialising the database. Please try again.\x1b[0m",
+                "\x1b[31mCould not retrieve database info. Please check if the database exists.\x1b[0m",
             );
             cancel("Operation cancelled.");
         }
     } else {
         // Extract database ID from the output
-        const matchResult = (creationOutput as string).match(
+        const matchResult = creationOutput.match(
             /database_id = "(.*)"/,
         );
         if (matchResult && matchResult.length === 2 && matchResult !== undefined) {
@@ -376,14 +385,6 @@ async function main() {
             cancel("Operation cancelled.");
             process.exit(1);
         }
-
-        // try {
-        //     await createBucketR2();
-        // } catch (error) {
-        //     console.error("\x1b[31mError:", error, "\x1b[0m");
-        //     cancel("Operation cancelled.");
-        //     process.exit(1);
-        // }
 
         await promptForGoogleClientCredentials();
         console.log("\x1b[33mReady... Set... Launch\x1b[0m");
