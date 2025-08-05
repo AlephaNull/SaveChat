@@ -81,3 +81,42 @@ export const authenticators = sqliteTable(
     }),
   })
 )
+
+// SaveChat specific tables
+export const conversations = sqliteTable("conversation", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  url: text("url"),
+  createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
+
+export const savedResponses = sqliteTable("saved_response", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  conversationId: text("conversationId")
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  text: text("text").notNull(), // The actual ChatGPT response text
+  context: text("context"), // JSON string of conversation context
+  url: text("url"), // URL where this response was saved from
+  title: text("title"), // Page title or conversation title
+  createdAt: integer("createdAt", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+})
